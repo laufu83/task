@@ -5,31 +5,54 @@ server:
     threads:
       max: 10
       core: 5
+    # 连接超时配置（避免长时间等待）
+    connection-timeout: 30000
 
 spring:
   profiles:
     active: prod
   jackson:
     time-zone: Asia/Shanghai
+    # 日期格式统一
+    date-format: yyyy-MM-dd HH:mm:ss
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
+      # 连接池大小：调度任务轻量，2个连接足够
       maximum-pool-size: 2
       minimum-idle: 1
       idle-timeout: 300000
+      # 连接超时（毫秒）
+      connection-timeout: 10000
+      # 连接存活检测
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
   thymeleaf:
     cache: true
     prefix: classpath:/templates/
     suffix: .html
     encoding: UTF-8
+    # 模板模式
+    mode: HTML
   autoconfigure:
     exclude:
+      # 如果不需要 Actuator 监控，排除
       - org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration
 
+# ==================== 任务调度配置 ====================
 task:
+  # 扫描频率（Cron表达式）- 默认每分钟
+  scan-cron: 0 * * * * ?
+  # 最大并发执行任务数
+  max-concurrent: 5
+  # 默认HTTP请求超时（毫秒）
+  http-timeout: 30000
+  # 日志清理Cron表达式 - 每天凌晨2点
+  log-clear-cron: 0 0 2 * * ?
   scheduling:
     pool:
+      # Spring内置调度线程池大小
       size: 1

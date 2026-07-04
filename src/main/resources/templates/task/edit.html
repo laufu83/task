@@ -2,7 +2,10 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${task?.id != null} ? '编辑任务' : '新增任务'"></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         .tip-text {
             font-size: 13px;
@@ -16,6 +19,32 @@
         .is-invalid ~ .invalid-feedback {
             display: block;
         }
+        .form-label {
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 1.5rem;
+        }
+        .cron-preview {
+            font-size: 13px;
+            color: #0d6efd;
+            background: #e7f1ff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .cron-preview i {
+            margin-right: 4px;
+        }
+        @media (max-width: 768px) {
+            .row .col-2 {
+                width: 100%;
+                margin-bottom: 4px;
+            }
+            .row .col-10 {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -23,139 +52,299 @@
 
 <th:block th:fragment="content">
     <div class="container mt-4">
-        <h5 class="mb-3" th:text="${task!=null?'编辑任务':'新增任务'}"></h5>
 
-        <!-- 后端全局错误提示 -->
-        <th:block th:if="${errorMsg}">
-            <div class="alert alert-danger mb-3">
-                <span th:text="${errorMsg}"></span>
-            </div>
-        </th:block>
+        <!-- ==================== 标题 ==================== -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="mb-0">
+                <i class="bi bi-plus-circle" th:if="${task?.id == null}"></i>
+                <i class="bi bi-pencil-square" th:if="${task?.id != null}"></i>
+                <span th:text="${task?.id != null} ? '编辑任务' : '新增任务'"></span>
+                <span th:if="${task?.id != null}" class="badge bg-secondary ms-2">ID: <span th:text="${task?.id}"></span></span>
+            </h5>
+            <a th:href="@{/task/list}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> 返回列表
+            </a>
+        </div>
 
-        <form th:action="@{/task/save}" method="post" id="taskForm">
-            <input type="hidden" name="id" th:value="${task?.id}">
+        <!-- ==================== 后端错误提示 ==================== -->
+        <div th:if="${errorMsg}" class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            <span th:text="${errorMsg}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
 
-            <div class="row mb-3 align-items-center">
-                <label class="col-2 col-form-label">任务名称 <span class="text-danger">*</span></label>
-                <div class="col-10">
-                    <input name="taskName" class="form-control" th:value="${task?.taskName}" required maxlength="50">
-                    <div class="tip-text">最多50个字符</div>
-                </div>
-            </div>
+        <!-- ==================== 表单 ==================== -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form th:action="@{/task/save}" method="post" id="taskForm" novalidate>
+                    <input type="hidden" name="id" th:value="${task?.id}">
 
-            <div class="row mb-3 align-items-center">
-                <label class="col-2 col-form-label">Cron表达式 <span class="text-danger">*</span></label>
-                <div class="col-10">
-                    <div class="input-group">
-                        <input name="cronExpr" class="form-control" id="cronInput" th:value="${task?.cronExpr}" required
-                               placeholder="例：0 * * * * ? 每分钟执行一次">
-                        <select class="form-select flex-shrink-0" style="width: 180px" id="cronSelect">
-                            <option value="">常用模板选择</option>
-                            <option value="0 * * * * ?">每分钟执行</option>
-                            <option value="0 */10 * * * ?">每10分钟执行</option>
-                            <option value="0 0 * * * ?">每小时整点执行</option>
-                            <option value="0 0 2 * * ?">每天凌晨2点执行</option>
-                        </select>
+                    <!-- 任务名称 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">
+                            任务名称 <span class="text-danger">*</span>
+                        </label>
+                        <div class="col-sm-10">
+                            <input name="taskName" class="form-control"
+                                   th:value="${task?.taskName}"
+                                   required maxlength="50"
+                                   placeholder="请输入任务名称">
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i> 最多50个字符
+                            </div>
+                        </div>
                     </div>
-                    <div class="tip-text mt-1">
-                        格式：秒 分 时 日 月 星期 &nbsp;
-                        示例：<code>0 * * * * ?</code> 每分钟第0秒执行
+
+                    <!-- Cron表达式 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">
+                            Cron表达式 <span class="text-danger">*</span>
+                        </label>
+                        <div class="col-sm-10">
+                            <div class="input-group">
+                                <input name="cronExpr" class="form-control" id="cronInput"
+                                       th:value="${task?.cronExpr}" required
+                                       placeholder="例：0 * * * * ? 每分钟执行一次"
+                                       pattern="^(\S+\s+){5}\S+$">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-clock"></i> 模板
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 * * * * ?')">每分钟执行</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 */5 * * * ?')">每5分钟执行</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 */10 * * * ?')">每10分钟执行</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 */30 * * * ?')">每30分钟执行</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 0 * * * ?')">每小时整点</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 0 2 * * ?')">每天凌晨2点</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 30 8 * * ?')">每天上午8:30</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 0 0 * * ?')">每天午夜</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setCron('0 0 12 * * ?')">每天中午12点</a></li>
+                                </ul>
+                            </div>
+                            <div class="tip-text mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                格式：<code>秒 分 时 日 月 星期</code>（6段）
+                                <span id="cronPreview" class="cron-preview ms-2" style="display:none;">
+                                    <i class="bi bi-check-circle"></i> 表达式有效
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="row mb-3 align-items-center">
-                <label class="col-2 col-form-label">请求方式 <span class="text-danger">*</span></label>
-                <div class="col-10">
-                    <select name="requestMethod" class="form-select" id="methodSelect">
-                        <option value="GET" th:selected="${task?.requestMethod=='GET'}">GET</option>
-                        <option value="POST" th:selected="${task?.requestMethod=='POST'}">POST</option>
-                        <option value="PUT" th:selected="${task?.requestMethod=='PUT'}">PUT</option>
-                        <option value="DELETE" th:selected="${task?.requestMethod=='DELETE'}">DELETE</option>
-                        <option value="PATCH" th:selected="${task?.requestMethod=='PATCH'}">PATCH</option>
-                        <option value="HEAD" th:selected="${task?.requestMethod=='HEAD'}">HEAD</option>
-                        <option value="OPTIONS" th:selected="${task?.requestMethod=='OPTIONS'}">OPTIONS</option>
-                    </select>
-                </div>
-            </div>
+                    <!-- 请求方式 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">
+                            请求方式 <span class="text-danger">*</span>
+                        </label>
+                        <div class="col-sm-10">
+                            <select name="requestMethod" class="form-select" id="methodSelect">
+                                <option value="GET" th:selected="${task?.requestMethod=='GET'}">GET</option>
+                                <option value="POST" th:selected="${task?.requestMethod=='POST'}">POST</option>
+                                <option value="PUT" th:selected="${task?.requestMethod=='PUT'}">PUT</option>
+                                <option value="DELETE" th:selected="${task?.requestMethod=='DELETE'}">DELETE</option>
+                                <option value="PATCH" th:selected="${task?.requestMethod=='PATCH'}">PATCH</option>
+                                <option value="HEAD" th:selected="${task?.requestMethod=='HEAD'}">HEAD</option>
+                                <option value="OPTIONS" th:selected="${task?.requestMethod=='OPTIONS'}">OPTIONS</option>
+                            </select>
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i>
+                                GET/HEAD/OPTIONS 请求不支持请求体，将自动禁用
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row mb-3 align-items-center">
-                <label class="col-2 col-form-label">请求地址 <span class="text-danger">*</span></label>
-                <div class="col-10">
-                    <input name="httpUrl" class="form-control" id="urlInput" th:value="${task?.httpUrl}" required placeholder="必须以 http:// 或 https:// 开头">
-                    <div class="invalid-feedback" id="urlError">请求地址格式非法，必须以 http/https 开头</div>
-                </div>
-            </div>
+                    <!-- 请求地址 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">
+                            请求地址 <span class="text-danger">*</span>
+                        </label>
+                        <div class="col-sm-10">
+                            <input name="httpUrl" class="form-control" id="urlInput"
+                                   th:value="${task?.httpUrl}" required
+                                   placeholder="必须以 http:// 或 https:// 开头">
+                            <div class="invalid-feedback" id="urlError">
+                                <i class="bi bi-exclamation-circle"></i> 请求地址必须以 http:// 或 https:// 开头
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row mb-3 align-items-start">
-                <label class="col-2 col-form-label pt-2">请求头(JSON)</label>
-                <div class="col-10">
-                    <textarea name="headerParams" class="form-control" id="headerInput" rows="3" th:text="${task?.headerParams}" placeholder="标准JSON格式，留空则不携带"></textarea>
-                    <div class="invalid-feedback" id="headerError">JSON格式错误</div>
-                </div>
-            </div>
+                    <!-- 请求头 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label pt-2">请求头 (JSON)</label>
+                        <div class="col-sm-10">
+                            <textarea name="headerParams" class="form-control" id="headerInput"
+                                      rows="3" th:text="${task?.headerParams}"
+                                      placeholder='标准JSON格式，留空则不携带&#10;例：{"Content-Type":"application/json"}'></textarea>
+                            <div class="invalid-feedback" id="headerError">
+                                <i class="bi bi-exclamation-circle"></i> JSON格式错误
+                            </div>
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i> 标准JSON对象格式，键和值使用双引号
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row mb-3 align-items-start">
-                <label class="col-2 col-form-label pt-2">请求体(JSON)</label>
-                <div class="col-10">
-                    <textarea name="requestBody" class="form-control" id="bodyInput" rows="3" th:text="${task?.requestBody}" placeholder="POST请求填写，GET方式自动禁用"></textarea>
-                    <div class="invalid-feedback" id="bodyError">JSON格式错误</div>
-                </div>
-            </div>
+                    <!-- 请求体 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label pt-2">请求体 (JSON)</label>
+                        <div class="col-sm-10">
+                            <textarea name="requestBody" class="form-control" id="bodyInput"
+                                      rows="3" th:text="${task?.requestBody}"
+                                      placeholder='标准JSON格式，留空则不携带&#10;例：{"key":"value"}'></textarea>
+                            <div class="invalid-feedback" id="bodyError">
+                                <i class="bi bi-exclamation-circle"></i> JSON格式错误
+                            </div>
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i>
+                                GET/HEAD/OPTIONS 请求会自动禁用此字段
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row mb-3 align-items-center">
-                <label class="col-2 col-form-label">任务状态 <span class="text-danger">*</span></label>
-                <div class="col-10">
-                    <select name="taskStatus" class="form-select">
-                        <option value="1" th:selected="${task?.taskStatus==1}">启用</option>
-                        <option value="0" th:selected="${task?.taskStatus==0}">停用</option>
-                    </select>
-                </div>
-            </div>
+                    <!-- 超时时间 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">超时时间 (秒)</label>
+                        <div class="col-sm-10">
+                            <input name="timeoutSeconds" class="form-control"
+                                   th:value="${task?.timeoutSeconds ?: 30}"
+                                   type="number" min="1" max="300"
+                                   placeholder="默认30秒">
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i> 取值范围：1-300秒，默认30秒
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row mb-4 align-items-center">
-                <label class="col-2 col-form-label">备注</label>
-                <div class="col-10">
-                    <input name="remark" class="form-control" th:value="${task?.remark}" maxlength="200">
-                </div>
-            </div>
+                    <!-- 最大重试次数 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">最大重试次数</label>
+                        <div class="col-sm-10">
+                            <input name="maxRetries" class="form-control"
+                                   th:value="${task?.maxRetries ?: 3}"
+                                   type="number" min="0" max="10"
+                                   placeholder="默认3次">
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i> 取值范围：0-10次，默认3次（0表示不重试）
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="row">
-                <div class="col offset-2">
-                    <button type="submit" class="btn btn-primary" id="submitBtn">保存</button>
-                    <button type="reset" class="btn btn-outline-secondary ms-2">重置</button>
-                    <a th:href="@{/task/list}" class="btn btn-secondary ms-2">返回</a>
-                </div>
+                    <!-- 任务状态 -->
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label form-label">
+                            任务状态 <span class="text-danger">*</span>
+                        </label>
+                        <div class="col-sm-10">
+                            <select name="taskStatus" class="form-select">
+                                <option value="1" th:selected="${task?.taskStatus==1}">
+                                    <i class="bi bi-play-circle"></i> 启用
+                                </option>
+                                <option value="0" th:selected="${task?.taskStatus==0}">
+                                    <i class="bi bi-pause-circle"></i> 停用
+                                </option>
+                            </select>
+                            <div class="tip-text">
+                                <i class="bi bi-info-circle"></i>
+                                启用后任务将按Cron表达式自动调度执行
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 备注 -->
+                    <div class="row mb-4">
+                        <label class="col-sm-2 col-form-label form-label">备注</label>
+                        <div class="col-sm-10">
+                            <input name="remark" class="form-control"
+                                   th:value="${task?.remark}"
+                                   maxlength="200"
+                                   placeholder="可选，最多200个字符">
+                        </div>
+                    </div>
+
+                    <!-- 按钮 -->
+                    <div class="row">
+                        <div class="col-sm-10 offset-sm-2">
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="bi bi-check-lg"></i> 保存
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary ms-2">
+                                <i class="bi bi-arrow-counterclockwise"></i> 重置
+                            </button>
+                            <a th:href="@{/task/list}" class="btn btn-secondary ms-2">
+                                <i class="bi bi-x-lg"></i> 取消
+                            </a>
+                        </div>
+                    </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
 </th:block>
 
-<script>
-    // Cron模板自动填充
+<!-- ==================== JavaScript ==================== -->
+<script th:inline="javascript">
+    // ===== 获取DOM元素 =====
     const cronSelect = document.getElementById('cronSelect');
     const cronInput = document.getElementById('cronInput');
-    cronSelect.addEventListener('change', function () {
-        if (this.value) cronInput.value = this.value;
-    });
-
-    // GET自动禁用请求体
+    const cronPreview = document.getElementById('cronPreview');
     const methodSelect = document.getElementById('methodSelect');
     const bodyInput = document.getElementById('bodyInput');
+    const headerInput = document.getElementById('headerInput');
+    const urlInput = document.getElementById('urlInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // ===== Cron模板快速填充 =====
+    function setCron(cron) {
+        cronInput.value = cron;
+        validateCron();
+        // 关闭下拉菜单
+        var dropdown = bootstrap.Dropdown.getInstance(document.querySelector('.dropdown-toggle'));
+        if (dropdown) dropdown.hide();
+    }
+
+    // ===== Cron实时校验 =====
+    function validateCron() {
+        var value = cronInput.value.trim();
+        var parts = value.split(/\s+/);
+        if (parts.length === 6 && value.length > 0) {
+            cronPreview.style.display = 'inline-block';
+            cronInput.classList.remove('is-invalid');
+            return true;
+        } else if (value.length === 0) {
+            cronPreview.style.display = 'none';
+            cronInput.classList.remove('is-invalid');
+            return false;
+        } else {
+            cronPreview.style.display = 'none';
+            cronInput.classList.add('is-invalid');
+            return false;
+        }
+    }
+    cronInput.addEventListener('input', validateCron);
+    cronInput.addEventListener('blur', validateCron);
+
+    // ===== GET请求自动禁用请求体 =====
     function toggleBody() {
+        var method = methodSelect.value;
         if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
             bodyInput.disabled = true;
+            bodyInput.placeholder = 'GET/HEAD/OPTIONS 请求不支持请求体';
             bodyInput.value = '';
+            bodyInput.classList.remove('is-invalid');
         } else {
             bodyInput.disabled = false;
+            bodyInput.placeholder = '标准JSON格式，留空则不携带\n例：{"key":"value"}';
         }
     }
     methodSelect.addEventListener('change', toggleBody);
     toggleBody();
 
-    // JSON校验
+    // ===== JSON校验 =====
     function isJson(str) {
-        if (!str.trim()) return true;
+        if (!str || !str.trim()) return true;
         try {
             JSON.parse(str);
             return true;
@@ -164,37 +353,40 @@
         }
     }
 
-    // 实时校验
-    const headerInput = document.getElementById('headerInput');
-    const urlInput = document.getElementById('urlInput');
+    function validateHeader() {
+        var valid = isJson(headerInput.value);
+        headerInput.classList.toggle('is-invalid', !valid);
+        return valid;
+    }
 
-    headerInput.addEventListener('blur', () => {
-        headerInput.classList.toggle('is-invalid', !isJson(headerInput.value));
-    });
-    bodyInput.addEventListener('blur', () => {
-        if (!bodyInput.disabled) {
-            bodyInput.classList.toggle('is-invalid', !isJson(bodyInput.value));
-        }
-    });
+    function validateBody() {
+        if (bodyInput.disabled) return true;
+        var valid = isJson(bodyInput.value);
+        bodyInput.classList.toggle('is-invalid', !valid);
+        return valid;
+    }
 
-    // 提交校验+去空格+防重复提交
+    headerInput.addEventListener('blur', validateHeader);
+    bodyInput.addEventListener('blur', validateBody);
+
+    // ===== 提交校验 =====
     document.getElementById('taskForm').addEventListener('submit', function (e) {
-        const submitBtn = document.getElementById('submitBtn');
         // 批量去首尾空格
-        this.querySelectorAll('input,textarea').forEach(el => el.value = el.value.trim());
+        this.querySelectorAll('input,textarea').forEach(function(el) {
+            if (el.value) el.value = el.value.trim();
+        });
 
-        // Cron校验6段
-        const cronArr = cronInput.value.split(/\s+/);
-        if (cronArr.length !== 6) {
+        // Cron校验
+        if (!validateCron()) {
             e.preventDefault();
-            alert('Cron必须为6段：秒 分 时 日 月 星期');
+            alert('Cron表达式格式错误，请确保为6段：秒 分 时 日 月 星期');
             cronInput.focus();
             return;
         }
 
         // URL校验
-        const urlReg = /^(http|https):\/\/.+/;
-        const urlValid = urlReg.test(urlInput.value);
+        var urlReg = /^(http|https):\/\/.+/;
+        var urlValid = urlReg.test(urlInput.value);
         urlInput.classList.toggle('is-invalid', !urlValid);
         if (!urlValid) {
             e.preventDefault();
@@ -203,20 +395,51 @@
         }
 
         // JSON校验
-        const headerValid = isJson(headerInput.value);
-        const bodyValid = bodyInput.disabled || isJson(bodyInput.value);
-        headerInput.classList.toggle('is-invalid', !headerValid);
-        bodyInput.classList.toggle('is-invalid', !bodyValid);
+        var headerValid = validateHeader();
+        var bodyValid = validateBody();
         if (!headerValid || !bodyValid) {
             e.preventDefault();
-            alert('请求头/请求体JSON格式错误');
+            alert('请求头或请求体的JSON格式错误，请检查');
+            if (!headerValid) {
+                headerInput.focus();
+            } else {
+                bodyInput.focus();
+            }
+            return;
+        }
+
+        // 超时时间校验
+        var timeout = document.querySelector('input[name="timeoutSeconds"]');
+        if (timeout.value && (parseInt(timeout.value) < 1 || parseInt(timeout.value) > 300)) {
+            e.preventDefault();
+            alert('超时时间必须在 1-300 秒之间');
+            timeout.focus();
+            return;
+        }
+
+        // 最大重试次数校验
+        var maxRetries = document.querySelector('input[name="maxRetries"]');
+        if (maxRetries.value && (parseInt(maxRetries.value) < 0 || parseInt(maxRetries.value) > 10)) {
+            e.preventDefault();
+            alert('最大重试次数必须在 0-10 之间');
+            maxRetries.focus();
             return;
         }
 
         // 防止重复提交
         submitBtn.disabled = true;
-        submitBtn.textContent = '保存中...';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...';
     });
+
+    // ===== 初始校验 =====
+    setTimeout(function() {
+        validateCron();
+        validateHeader();
+        validateBody();
+    }, 100);
 </script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

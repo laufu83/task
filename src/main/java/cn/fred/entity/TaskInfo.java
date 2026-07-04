@@ -17,4 +17,10 @@ public class TaskInfo {
     private LocalDateTime lastExecuteTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    // 新增字段（需先执行 ALTER TABLE）
+    private LocalDateTime nextRunTime;
+    private Integer maxRetries;
+    private Integer retryCount;
+    private Integer timeoutSeconds;
+
 }

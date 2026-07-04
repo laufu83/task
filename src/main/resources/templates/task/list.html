@@ -2,103 +2,291 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务列表</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         .table {
             font-size: 14px;
         }
         .table th {
             background-color: #f8f9fa;
+            white-space: nowrap;
+        }
+        .table td {
+            vertical-align: middle;
         }
         .fs-14 {
             font-size: 14px;
         }
+        .text-break {
+            word-break: break-all;
+            max-width: 200px;
+        }
+        .btn-group-sm .btn {
+            font-size: 12px;
+            padding: 0.2rem 0.5rem;
+        }
+        .badge-status {
+            font-size: 12px;
+            padding: 4px 10px;
+        }
+        .cron-code {
+            background: #f1f3f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .alert {
+            border-radius: 8px;
+        }
+        .pagination {
+            flex-wrap: wrap;
+        }
+        .pagination .page-link {
+            padding: 0.375rem 0.75rem;
+        }
+        .task-id {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        @media (max-width: 768px) {
+            .table-responsive {
+                font-size: 12px;
+            }
+            .btn-group-sm .btn {
+                font-size: 11px;
+                padding: 0.15rem 0.4rem;
+            }
+            .pagination .page-link {
+                padding: 0.25rem 0.5rem;
+                font-size: 12px;
+            }
+            .badge-status {
+                font-size: 11px;
+                padding: 3px 8px;
+            }
+        }
     </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
 <body>
 <th:block th:include="index"></th:block>
 
 <th:block th:fragment="content">
     <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h5 class="mb-0">任务列表</h5>
-            <a th:href="@{/task/add}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> 新增任务
-            </a>
+
+        <!-- ==================== 提示消息 ==================== -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle-fill"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
 
+        <!-- ==================== 标题和操作栏 ==================== -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0">
+                    <i class="bi bi-list-task"></i> 任务列表
+                    <span class="badge bg-secondary ms-2" th:text="'共 ' + ${page.total} + ' 个任务'"></span>
+                </h5>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                </button>
+                <a th:href="@{/task/add}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> 新增任务
+                </a>
+            </div>
+        </div>
+
+        <!-- ==================== 统计卡片 ==================== -->
+        <div class="row g-2 mb-3">
+            <div class="col-md-3 col-6">
+                <div class="card text-center bg-light">
+                    <div class="card-body py-2">
+                        <span class="text-muted small">总任务</span>
+                        <h6 class="mb-0" th:text="${page.total}"></h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card text-center bg-success bg-opacity-10">
+                    <div class="card-body py-2">
+                        <span class="text-muted small">已启用</span>
+                        <h6 class="mb-0 text-success" th:text="${#lists.size(page.records.?[taskStatus == 1])}"></h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card text-center bg-danger bg-opacity-10">
+                    <div class="card-body py-2">
+                        <span class="text-muted small">已停用</span>
+                        <h6 class="mb-0 text-danger" th:text="${#lists.size(page.records.?[taskStatus == 0])}"></h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card text-center bg-warning bg-opacity-10">
+                    <div class="card-body py-2">
+                        <span class="text-muted small">执行失败</span>
+                        <h6 class="mb-0 text-warning" th:text="${#lists.size(page.records.?[taskStatus == 2])}"></h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 任务表格 ==================== -->
         <div class="card shadow-sm mb-4">
             <div class="table-responsive">
                 <table class="table table-bordered table-striped table-hover mb-0">
                     <thead>
                     <tr>
-                        <th width="60">ID</th>
+                        <th width="55">ID</th>
                         <th>任务名称</th>
-                        <th>Cron表达式</th>
+                        <th width="130">Cron表达式</th>
                         <th>请求地址</th>
-                        <th width="80">请求方式</th>
-                        <th width="90">状态</th>
-                        <th width="380">操作</th>
+                        <th width="75">请求方式</th>
+                        <th width="75">状态</th>
+                        <th width="280">操作</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="item : ${page.records}">
-                        <td th:text="${item.id}"></td>
-                        <td th:text="${item.taskName}"></td>
-                        <td><code th:text="${item.cronExpr}"></code></td>
-                        <td class="text-break" th:text="${item.httpUrl}"></td>
-                        <td th:text="${item.requestMethod}"></td>
+                        <td class="text-center task-id" th:text="${item.id}"></td>
                         <td>
-                            <span th:if="${item.taskStatus == 1}" class="badge bg-success">启用</span>
-                            <span th:if="${item.taskStatus == 0}" class="badge bg-danger">停用</span>
+                            <span th:text="${item.taskName}"></span>
+                            <span th:if="${item.remark != null && item.remark != ''}"
+                                  class="text-muted ms-1" title="备注">
+                                <i class="bi bi-info-circle" th:title="${item.remark}"></i>
+                            </span>
                         </td>
                         <td>
-
-                            <a th:href="@{/task/edit(id=${item.id})}" class="btn btn-sm btn-info ms-1">编辑</a>
-                            <a th:href="@{/task/delete(id=${item.id})}" onclick="return confirm('确定要删除该任务吗？删除后不可恢复！')" class="btn btn-sm btn-danger ms-1">删除</a>
-                            <a th:href="@{/task/execute(id=${item.id})}" onclick="return confirm('确定立即手动执行该任务吗？')" class="btn btn-sm btn-success">
-                                <i class="bi bi-play-fill"></i> 手动执行
-                            </a>
-                            <a th:href="@{/log/list(taskId=${item.id})}" class="btn btn-sm btn-secondary ms-1">执行日志</a>
+                            <code class="cron-code" th:text="${item.cronExpr}"></code>
+                        </td>
+                        <td class="text-break" th:text="${item.httpUrl}"></td>
+                        <td>
+                            <span class="badge bg-primary" th:text="${item.requestMethod}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${item.taskStatus == 1}" class="badge bg-success badge-status">
+                                <i class="bi bi-play-circle"></i> 启用
+                            </span>
+                            <span th:if="${item.taskStatus == 0}" class="badge bg-secondary badge-status">
+                                <i class="bi bi-pause-circle"></i> 停用
+                            </span>
+                            <span th:if="${item.taskStatus == 2}" class="badge bg-danger badge-status">
+                                <i class="bi bi-exclamation-circle"></i> 失败
+                            </span>
+                            <span th:if="${item.taskStatus == 3}" class="badge bg-warning text-dark badge-status">
+                                <i class="bi bi-arrow-repeat"></i> 执行中
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm flex-wrap gap-1">
+                                <!-- 编辑 -->
+                                <a th:href="@{/task/edit(id=${item.id})}" class="btn btn-outline-primary" title="编辑任务">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <!-- 删除 -->
+                                <a th:href="@{/task/delete(id=${item.id})}"
+                                   onclick="return confirm('确定要删除任务「' + '[[${item.taskName}]]' + '」吗？\n删除后不可恢复！')"
+                                   class="btn btn-outline-danger" title="删除任务">
+                                    <i class="bi bi-trash3"></i>
+                                </a>
+                                <!-- 手动执行 -->
+                                <a th:href="@{/task/execute(id=${item.id})}"
+                                   onclick="return confirm('确定立即执行任务「[[${item.taskName}]]」吗？')"
+                                   class="btn btn-outline-success" title="立即执行">
+                                    <i class="bi bi-play-fill"></i>
+                                </a>
+                                <!-- 切换状态 -->
+                                <a th:href="@{/task/toggle(id=${item.id})}"
+                                   onclick="return confirm('确定要[[${item.taskStatus == 1} ? '停用' : '启用']]任务「[[${item.taskName}]]」吗？')"
+                                   class="btn btn-outline-warning"
+                                   th:title="${item.taskStatus == 1} ? '停用任务' : '启用任务'">
+                                    <i th:if="${item.taskStatus == 1}" class="bi bi-pause-circle"></i>
+                                    <i th:if="${item.taskStatus == 0 or item.taskStatus == 2}" class="bi bi-play-circle"></i>
+                                </a>
+                                <!-- 查看日志 -->
+                                <a th:href="@{/log/list(taskId=${item.id})}" class="btn btn-outline-secondary" title="查看执行日志">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                                <!-- 重置（仅失败状态显示） -->
+                                <a th:if="${item.taskStatus == 2}"
+                                   th:href="@{/task/reset(id=${item.id})}"
+                                   onclick="return confirm('重置任务「[[${item.taskName}]]」将恢复启用状态，继续执行调度吗？')"
+                                   class="btn btn-outline-info" title="重置任务">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(page.records)}">
-                        <td colspan="7" class="text-center text-muted py-4">暂无任务数据，请点击新增任务</td>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            暂无任务数据，请点击 <a th:href="@{/task/add}" class="btn btn-primary btn-sm">新增任务</a>
+                        </td>
                     </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
+        <!-- ==================== 分页 ==================== -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span class="text-muted fs-14">
-                共 <span th:text="${page.total}"></span> 条数据，第 <span th:text="${page.pageNum}"></span>/<span th:text="${page.pages}"></span> 页
+                共 <span th:text="${page.total}"></span> 条数据，
+                第 <span th:text="${page.pageNum}"></span>/<span th:text="${page.pages}"></span> 页，
+                每页 <span th:text="${page.pageSize}"></span> 条
             </span>
-            <ul class="pagination mb-0">
+            <ul class="pagination mb-0" th:if="${page.pages > 1}">
+                <!-- 首页 -->
                 <li class="page-item" th:class="${page.pageNum == 1} ? 'disabled'">
-                    <a class="page-link" th:href="@{/task/list(pageNum=1)}">首页</a>
+                    <a class="page-link" th:href="@{/task/list(pageNum=1, pageSize=${pageSize})}">
+                        <i class="bi bi-chevron-double-left"></i>
+                    </a>
                 </li>
+                <!-- 上一页 -->
                 <li class="page-item" th:class="${page.pageNum == 1} ? 'disabled'">
-                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum - 1})}">上一页</a>
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum - 1}, pageSize=${pageSize})}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
                 </li>
 
-                <th:block th:each="num : ${#numbers.sequence(1, page.pages)}">
+                <!-- 页码（智能显示，只显示当前页前后5页） -->
+                <th:block th:each="num : ${#numbers.sequence(
+                    ${page.pageNum - 3 > 1 ? page.pageNum - 3 : 1},
+                    ${page.pageNum + 3 < page.pages ? page.pageNum + 3 : page.pages}
+                )}">
                     <li class="page-item" th:class="${num == page.pageNum} ? 'active'">
-                        <a class="page-link" th:href="@{/task/list(pageNum=${num})}" th:text="${num}"></a>
+                        <a class="page-link" th:href="@{/task/list(pageNum=${num}, pageSize=${pageSize})}" th:text="${num}"></a>
                     </li>
                 </th:block>
 
+                <!-- 下一页 -->
                 <li class="page-item" th:class="${page.pageNum == page.pages} ? 'disabled'">
-                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum + 1})}">下一页</a>
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum + 1}, pageSize=${pageSize})}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
                 </li>
+                <!-- 末页 -->
                 <li class="page-item" th:class="${page.pageNum == page.pages} ? 'disabled'">
-                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pages})}">末页</a>
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pages}, pageSize=${pageSize})}">
+                        <i class="bi bi-chevron-double-right"></i>
+                    </a>
                 </li>
             </ul>
         </div>
     </div>
 </th:block>
 
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

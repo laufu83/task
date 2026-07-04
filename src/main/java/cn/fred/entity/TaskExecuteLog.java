@@ -7,7 +7,7 @@ public class TaskExecuteLog {
     private Long id;
     private Long taskId;
     private String taskName;
-    private Integer executeStatus;
+    private Integer executeStatus; // 1成功 0失败
     private String requestMethod;
     private String requestUrl;
     private String requestHeader;

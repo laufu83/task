@@ -2,17 +2,69 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>执行日志详情</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         pre {
             white-space: pre-wrap;
             word-wrap: break-word;
             background-color: #f8f9fa;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 12px 16px;
+            border-radius: 6px;
             font-size: 13px;
-            max-height: 300px;
+            max-height: 350px;
             overflow-y: auto;
+            margin: 0;
+            border: 1px solid #e9ecef;
+        }
+        pre.json {
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            border-color: #313244;
+        }
+        .table-detail th {
+            background-color: #f8f9fa;
+            width: 160px;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .table-detail td {
+            vertical-align: middle;
+        }
+        .badge-method {
+            font-size: 14px;
+            padding: 6px 14px;
+        }
+        .status-badge {
+            font-size: 14px;
+            padding: 6px 16px;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .copy-btn {
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .copy-btn:hover {
+            color: #0d6efd;
+        }
+        @media (max-width: 768px) {
+            .table-detail th {
+                width: 100px;
+                font-size: 13px;
+            }
+            .table-detail td {
+                font-size: 13px;
+            }
+            pre {
+                font-size: 12px;
+                max-height: 200px;
+                padding: 8px 12px;
+            }
         }
     </style>
 </head>
@@ -21,64 +73,255 @@
 
 <th:block th:fragment="content">
     <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h5 class="mb-0">执行日志详情</h5>
-            <a href="javascript:history.back()" class="btn btn-secondary">返回列表</a>
-        </div>
 
-        <div class="card shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-borderless table-striped mb-0">
-                    <tbody>
-                    <tr>
-                        <th width="160" class="bg-light">任务名称</th>
-                        <td th:text="${log.taskName}"></td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">请求方式</th>
-                        <td><span class="badge bg-primary" th:text="${log.requestMethod}"></span></td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">请求地址</th>
-                        <td class="text-break" th:text="${log.requestUrl}"></td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">请求头(JSON)</th>
-                        <td>
-                            <pre th:text="${log.requestHeader ?: '无'}"></pre>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">请求参数(Body)</th>
-                        <td>
-                            <pre th:text="${log.requestBody ?: '无'}"></pre>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">接口返回数据</th>
-                        <td>
-                            <pre th:text="${log.responseData ?: '无'}"></pre>
-                        </td>
-                    </tr>
-                    <tr th:if="${log.errorMsg != null}">
-                        <th class="bg-light">异常错误信息</th>
-                        <td class="text-danger">
-                            <pre th:text="${log.errorMsg}"></pre>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">执行耗时(ms)</th>
-                        <td th:text="${log.costTime}"></td>
-                    </tr>
-                    <tr>
-                        <th class="bg-light">执行时间</th>
-                        <td th:text="${log.executeTime}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+        <!-- ==================== 标题和操作 ==================== -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0">
+                    <i class="bi bi-file-text"></i> 执行日志详情
+                    <span class="badge bg-secondary ms-2">ID: <span th:text="${log.id}"></span></span>
+                </h5>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="javascript:history.back()" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> 返回列表
+                </a>
+                <a th:href="@{/log/list(taskId=${log.taskId})}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-list-ul"></i> 查看任务所有日志
+                </a>
+                <a th:href="@{/task/edit(id=${log.taskId})}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-pencil"></i> 编辑任务
+                </a>
             </div>
         </div>
+
+        <!-- ==================== 状态概览卡片 ==================== -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">执行状态</div>
+                        <span th:if="${log.executeStatus == 1}" class="badge bg-success status-badge">
+                            <i class="bi bi-check-circle"></i> 成功
+                        </span>
+                        <span th:if="${log.executeStatus == 0}" class="badge bg-danger status-badge">
+                            <i class="bi bi-x-circle"></i> 失败
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">请求方式</div>
+                        <span class="badge bg-primary badge-method" th:text="${log.requestMethod}"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">执行耗时</div>
+                        <span class="fw-bold" th:text="${log.costTime}"></span> ms
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">执行时间</div>
+                        <span th:text="${#temporals.format(log.executeTime, 'yyyy-MM-dd HH:mm:ss')}"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 详情表格 ==================== -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> 完整请求与响应信息
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-detail table-borderless table-striped mb-0">
+                        <tbody>
+                        <!-- 任务名称 -->
+                        <tr>
+                            <th><i class="bi bi-tag"></i> 任务名称</th>
+                            <td th:text="${log.taskName}"></td>
+                        </tr>
+                        <!-- 请求方式 -->
+                        <tr>
+                            <th><i class="bi bi-send"></i> 请求方式</th>
+                            <td>
+                                <span class="badge bg-primary badge-method" th:text="${log.requestMethod}"></span>
+                            </td>
+                        </tr>
+                        <!-- 请求地址 -->
+                        <tr>
+                            <th><i class="bi bi-link-45deg"></i> 请求地址</th>
+                            <td class="text-break">
+                                <code th:text="${log.requestUrl}"></code>
+                            </td>
+                        </tr>
+                        <!-- 请求头 -->
+                        <tr>
+                            <th><i class="bi bi-code-square"></i> 请求头</th>
+                            <td>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <pre th:class="${headerIsJson} ? 'json' : ''"
+                                         th:text="${log.requestHeader ?: '（无）'}"></pre>
+                                    <button class="btn btn-outline-secondary btn-sm ms-2 copy-btn"
+                                            onclick="copyText('请求头', [[${log.requestHeader}]])"
+                                            th:if="${log.requestHeader != null}">
+                                        <i class="bi bi-clipboard"></i> 复制
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 请求参数 -->
+                        <tr>
+                            <th><i class="bi bi-box-arrow-in-right"></i> 请求参数 (Body)</th>
+                            <td>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <pre th:class="${bodyIsJson} ? 'json' : ''"
+                                         th:text="${log.requestBody ?: '（无）'}"></pre>
+                                    <button class="btn btn-outline-secondary btn-sm ms-2 copy-btn"
+                                            onclick="copyText('请求参数', [[${log.requestBody}]])"
+                                            th:if="${log.requestBody != null}">
+                                        <i class="bi bi-clipboard"></i> 复制
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 响应数据 -->
+                        <tr>
+                            <th><i class="bi bi-arrow-return-left"></i> 响应数据</th>
+                            <td>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <pre th:class="${responseIsJson} ? 'json' : ''"
+                                         th:text="${log.responseData ?: '（无）'}"></pre>
+                                    <button class="btn btn-outline-secondary btn-sm ms-2 copy-btn"
+                                            onclick="copyText('响应数据', [[${log.responseData}]])"
+                                            th:if="${log.responseData != null}">
+                                        <i class="bi bi-clipboard"></i> 复制
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 错误信息（仅在失败时显示） -->
+                        <tr th:if="${log.errorMsg != null}">
+                            <th><i class="bi bi-exclamation-triangle"></i> 错误信息</th>
+                            <td>
+                                <div class="text-danger">
+                                    <pre class="border border-danger" th:text="${log.errorMsg}"></pre>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 执行耗时 -->
+                        <tr>
+                            <th><i class="bi bi-clock"></i> 执行耗时</th>
+                            <td><span class="fw-bold" th:text="${log.costTime}"></span> 毫秒</td>
+                        </tr>
+                        <!-- 执行时间 -->
+                        <tr>
+                            <th><i class="bi bi-calendar-event"></i> 执行时间</th>
+                            <td th:text="${#temporals.format(log.executeTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 底部操作 ==================== -->
+        <div class="mt-4 d-flex gap-2 flex-wrap">
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> 返回列表
+            </a>
+            <a th:href="@{/log/list(taskId=${log.taskId})}" class="btn btn-outline-primary">
+                <i class="bi bi-list-ul"></i> 查看任务所有日志
+            </a>
+            <a th:href="@{/task/edit(id=${log.taskId})}" class="btn btn-outline-success">
+                <i class="bi bi-pencil"></i> 编辑任务
+            </a>
+            <button class="btn btn-outline-danger" onclick="deleteLog([[${log.id}]], [[${log.taskId}]])">
+                <i class="bi bi-trash3"></i> 删除此日志
+            </button>
+        </div>
     </div>
+
+    <!-- ==================== JavaScript ==================== -->
+    <script>
+        function copyText(name, text) {
+            if (!text) {
+                alert('没有内容可复制');
+                return;
+            }
+            var content = text || '';
+            navigator.clipboard.writeText(content).then(function() {
+                showToast('已复制 ' + name + ' 到剪贴板');
+            }).catch(function() {
+                var textarea = document.createElement('textarea');
+                textarea.value = content;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('已复制 ' + name + ' 到剪贴板');
+            });
+        }
+
+        function deleteLog(logId, taskId) {
+            if (!confirm('确定要删除这条日志吗？删除后无法恢复！')) {
+                return;
+            }
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/log/delete';
+            var inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'id';
+            inputId.value = logId;
+            form.appendChild(inputId);
+            if (taskId) {
+                var inputTask = document.createElement('input');
+                inputTask.type = 'hidden';
+                inputTask.name = 'taskId';
+                inputTask.value = taskId;
+                form.appendChild(inputTask);
+            }
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function showToast(message) {
+            var toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+                'background:#333;color:#fff;padding:12px 24px;border-radius:8px;' +
+                'z-index:9999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);' +
+                'animation:fadeInOut 2.5s ease forwards;';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function() {
+                document.body.removeChild(toast);
+            }, 2500);
+        }
+
+        var style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
 </th:block>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -25,38 +25,49 @@ import java.util.Map;
  * 5. 默认UA、默认JSON请求头，自定义头可覆盖
  * 6. 非2xx状态码抛异常，业务可捕获记录失败
  * 7. 全方法快捷重载调用
+ * 8. 支持自定义超时参数
  */
 public class HttpClientUtil {
 
     private static final Logger log = LoggerFactory.getLogger(HttpClientUtil.class);
 
-    // 超时配置 毫秒
-    private static final int CONNECT_TIMEOUT = 5000;
-    private static final int READ_TIMEOUT = 8000;
-    private static final int CONNECTION_REQUEST_TIMEOUT = 5000;
+    // 默认超时配置 毫秒
+    private static final int DEFAULT_CONNECT_TIMEOUT = 5000;
+    private static final int DEFAULT_READ_TIMEOUT = 8000;
+    private static final int DEFAULT_CONNECTION_REQUEST_TIMEOUT = 5000;
     // 最大响应 2MB
     private static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
     /**
-     * 统一HTTP请求入口，支持 GET POST PUT DELETE PATCH HEAD OPTIONS
+     * 统一HTTP请求入口（使用默认超时）
+     */
+    public static String doRequest(String url, String method, String headerJson, String bodyJson) throws IOException {
+        return doRequest(url, method, headerJson, bodyJson, DEFAULT_READ_TIMEOUT);
+    }
+
+    /**
+     * 统一HTTP请求入口（支持自定义超时）
      * @param url 请求地址
      * @param method 请求方式（不区分大小写）
      * @param headerJson 请求头JSON
      * @param bodyJson 请求体JSON
+     * @param timeoutMillis 自定义超时时间（毫秒），传null或<=0使用默认值
      * @return 响应内容
      * @throws IOException 网络、状态码异常
      */
-    public static String doRequest(String url, String method, String headerJson, String bodyJson) throws IOException {
+    public static String doRequest(String url, String method, String headerJson, String bodyJson, Integer timeoutMillis) throws IOException {
         headerJson = trimStr(headerJson);
         bodyJson = trimStr(bodyJson);
         String reqMethod = method.toUpperCase().trim();
         long start = System.currentTimeMillis();
 
-        // 超时、重定向配置
+        // 超时配置：如果传入超时参数且>0则使用，否则使用默认值
+        int readTimeout = (timeoutMillis != null && timeoutMillis > 0) ? timeoutMillis : DEFAULT_READ_TIMEOUT;
+
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(CONNECT_TIMEOUT)
-                .setSocketTimeout(READ_TIMEOUT)
-                .setConnectionRequestTimeout(CONNECTION_REQUEST_TIMEOUT)
+                .setConnectTimeout(DEFAULT_CONNECT_TIMEOUT)
+                .setSocketTimeout(readTimeout)
+                .setConnectionRequestTimeout(DEFAULT_CONNECTION_REQUEST_TIMEOUT)
                 .setRedirectsEnabled(true)
                 .build();
 
@@ -106,8 +117,8 @@ public class HttpClientUtil {
                         ? respBody.substring(0, 500) + "..."
                         : respBody;
 
-                log.info("[HTTP] {} {} | status:{} | cost:{}ms | header:{} | body:{} | resp:{}",
-                        reqMethod, url, statusCode, cost, headerJson, bodyJson, logResp);
+                log.info("[HTTP] {} {} | status:{} | cost:{}ms | timeout:{}ms | header:{} | body:{} | resp:{}",
+                        reqMethod, url, statusCode, cost, readTimeout, headerJson, bodyJson, logResp);
 
                 // 非2xx抛出异常
                 if (statusCode < 200 || statusCode >= 300) {
@@ -120,7 +131,7 @@ public class HttpClientUtil {
     }
 
     /**
-     * 根据请求方式构建对应请求对象，支持带Body的PUT/POST/PATCH
+     * 根据请求方式构建对应请求对象
      */
     private static HttpRequestBase buildHttpRequest(String method, String url, String bodyJson) throws IOException {
         HttpEntityEnclosingRequestBase entityRequest = null;
@@ -135,7 +146,6 @@ public class HttpClientUtil {
                 entityRequest = new HttpPatch(url);
                 break;
             case "DELETE":
-                // DELETE 支持携带请求体
                 entityRequest = new HttpDeleteWithBody(url);
                 break;
             case "GET":
@@ -149,7 +159,7 @@ public class HttpClientUtil {
         }
 
         // PUT POST PATCH DELETE 携带Body
-        if (bodyJson != null) {
+        if (bodyJson != null && !bodyJson.isBlank()) {
             StringEntity entity = new StringEntity(bodyJson, StandardCharsets.UTF_8);
             entityRequest.setEntity(entity);
         }
@@ -165,7 +175,7 @@ public class HttpClientUtil {
         return trim.isBlank() ? null : trim;
     }
 
-    // ===================== 快捷重载方法 =====================
+    // ===================== 快捷重载方法（使用默认超时） =====================
     public static String get(String url) throws IOException {
         return doRequest(url, "GET", null, null);
     }
@@ -200,6 +210,35 @@ public class HttpClientUtil {
 
     public static String options(String url, String headerJson) throws IOException {
         return doRequest(url, "OPTIONS", headerJson, null);
+    }
+
+    // ===================== 快捷重载方法（支持自定义超时） =====================
+    public static String get(String url, int timeoutMillis) throws IOException {
+        return doRequest(url, "GET", null, null, timeoutMillis);
+    }
+
+    public static String get(String url, String headerJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "GET", headerJson, null, timeoutMillis);
+    }
+
+    public static String post(String url, String bodyJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "POST", null, bodyJson, timeoutMillis);
+    }
+
+    public static String post(String url, String headerJson, String bodyJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "POST", headerJson, bodyJson, timeoutMillis);
+    }
+
+    public static String put(String url, String headerJson, String bodyJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "PUT", headerJson, bodyJson, timeoutMillis);
+    }
+
+    public static String delete(String url, String headerJson, String bodyJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "DELETE", headerJson, bodyJson, timeoutMillis);
+    }
+
+    public static String patch(String url, String headerJson, String bodyJson, int timeoutMillis) throws IOException {
+        return doRequest(url, "PATCH", headerJson, bodyJson, timeoutMillis);
     }
 
     // 自定义支持带Body的DELETE
