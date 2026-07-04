@@ -8,6 +8,7 @@ import cn.fred.utils.HttpClientUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.support.CronExpression;
@@ -15,9 +16,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 
 @Component
 @EnableScheduling
@@ -30,8 +28,6 @@ public class HttpScheduleTask {
     @Autowired
     private TaskExecuteLogDao taskExecuteLogDao;
 
-    @Value("${task.max-concurrent:5}")
-    private int maxConcurrent;
 
     @Value("${task.http-timeout:30000}")
     private int httpTimeout;
@@ -39,11 +35,7 @@ public class HttpScheduleTask {
     // 连续失败阈值：3次
     private static final int FAIL_THRESHOLD = 3;
 
-    private final Semaphore semaphore;
 
-    public HttpScheduleTask() {
-        this.semaphore = new Semaphore(maxConcurrent);
-    }
 
     // ==================== 任务扫描（异步多任务执行） ====================
     @Scheduled(cron = "${task.scan-cron:0 * * * * ?}")
@@ -53,35 +45,11 @@ public class HttpScheduleTask {
             LocalDateTime now = LocalDateTime.now();
             List<TaskInfo> taskList = taskInfoDao.findTasksToExecute(now);
             log.info("【定时任务】查询到待执行任务数量：{}", taskList.size());
-
             for (TaskInfo task : taskList) {
-                CompletableFuture.runAsync(() -> {
-                    boolean acquired;
-                    try {
-                        acquired = semaphore.tryAcquire(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        log.error("任务{}获取并发许可被中断", task.getId());
-                        return;
-                    }
-
-                    if (!acquired) {
-                        log.warn("任务ID:{} 获取执行许可超时，系统并发已满，本次放弃执行", task.getId());
-                        return;
-                    }
-                    try {
-                        log.info("【定时任务】开始执行任务：ID={}, 名称={}", task.getId(), task.getTaskName());
-                        executeSingleTask(task);
-                    } catch (Exception e) {
-                        log.error("任务异步执行异常，任务ID：{}", task.getId(), e);
-                    } finally {
-                        semaphore.release();
-                    }
-                }).exceptionally(ex -> {
-                    log.error("任务异步调度异常，任务ID:{}", task.getId(), ex);
-                    return null;
-                });
+                log.info("【定时任务】提交异步执行任务：ID={}, 名称={}", task.getId(), task.getTaskName());
+                executeSingleTask(task);
             }
+
         } catch (Exception e) {
             log.error("【定时任务】批量扫描任务发生异常", e);
         }
@@ -89,6 +57,7 @@ public class HttpScheduleTask {
     }
 
     // ==================== 单任务执行 ====================
+    @Async("taskExecutor")
     public void executeSingleTask(TaskInfo task) {
         long start = System.currentTimeMillis();
         TaskExecuteLog executeLog = buildExecuteLog(task);
