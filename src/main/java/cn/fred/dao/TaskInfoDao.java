@@ -58,7 +58,7 @@ public class TaskInfoDao extends BaseDao<TaskInfo> {
     }
 
     public int updateNextRunTime(Long taskId, LocalDateTime nextRunTime, LocalDateTime lastExecuteTime) {
-        String sql = "UPDATE task_info SET task_status = 1,next_run_time = ?, last_execute_time = ?, retry_count = 0 WHERE id = ?";
+        String sql = "UPDATE task_info SET next_run_time = ?, last_execute_time = ?, retry_count = 0 WHERE id = ?";
         return update(sql, nextRunTime, lastExecuteTime, taskId);
     }
 
@@ -76,4 +76,15 @@ public class TaskInfoDao extends BaseDao<TaskInfo> {
         String sql = "SELECT * FROM task_info ORDER BY next_run_time ASC";
         return list(sql);
     }
-}
+
+    public int increaseFailCount(Long taskId) {
+        String sql = "UPDATE task_info SET fail_count = fail_count + 1 WHERE id = ?";
+        update(sql, taskId);
+        // 查询当前最新失败次数
+        return getById(taskId).getFailCount();
+    }
+    public void clearFailCount(Long taskId) {
+        String sql = "UPDATE task_info SET fail_count = 0 WHERE id = ?";
+        update(sql, taskId);
+    }
+ }

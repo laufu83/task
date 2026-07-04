@@ -22,5 +22,6 @@ public class TaskInfo {
     private Integer maxRetries;
     private Integer retryCount;
     private Integer timeoutSeconds;
+    private Integer failCount;
 
 }
