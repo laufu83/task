@@ -1,0 +1,35 @@
+server:
+  address: 0.0.0.0
+  port: 8080
+  tomcat:
+    threads:
+      max: 10
+      core: 5
+
+spring:
+  profiles:
+    active: prod
+  jackson:
+    time-zone: Asia/Shanghai
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 1
+      idle-timeout: 300000
+  thymeleaf:
+    cache: true
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration
+
+task:
+  scheduling:
+    pool:
+      size: 1

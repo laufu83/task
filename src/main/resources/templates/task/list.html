@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .table {
+            font-size: 14px;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+        .fs-14 {
+            font-size: 14px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+<body>
+<th:block th:include="index"></th:block>
+
+<th:block th:fragment="content">
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="mb-0">任务列表</h5>
+            <a th:href="@{/task/add}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> 新增任务
+            </a>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover mb-0">
+                    <thead>
+                    <tr>
+                        <th width="60">ID</th>
+                        <th>任务名称</th>
+                        <th>Cron表达式</th>
+                        <th>请求地址</th>
+                        <th width="80">请求方式</th>
+                        <th width="90">状态</th>
+                        <th width="380">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${page.records}">
+                        <td th:text="${item.id}"></td>
+                        <td th:text="${item.taskName}"></td>
+                        <td><code th:text="${item.cronExpr}"></code></td>
+                        <td class="text-break" th:text="${item.httpUrl}"></td>
+                        <td th:text="${item.requestMethod}"></td>
+                        <td>
+                            <span th:if="${item.taskStatus == 1}" class="badge bg-success">启用</span>
+                            <span th:if="${item.taskStatus == 0}" class="badge bg-danger">停用</span>
+                        </td>
+                        <td>
+
+                            <a th:href="@{/task/edit(id=${item.id})}" class="btn btn-sm btn-info ms-1">编辑</a>
+                            <a th:href="@{/task/delete(id=${item.id})}" onclick="return confirm('确定要删除该任务吗？删除后不可恢复！')" class="btn btn-sm btn-danger ms-1">删除</a>
+                            <a th:href="@{/task/execute(id=${item.id})}" onclick="return confirm('确定立即手动执行该任务吗？')" class="btn btn-sm btn-success">
+                                <i class="bi bi-play-fill"></i> 手动执行
+                            </a>
+                            <a th:href="@{/log/list(taskId=${item.id})}" class="btn btn-sm btn-secondary ms-1">执行日志</a>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(page.records)}">
+                        <td colspan="7" class="text-center text-muted py-4">暂无任务数据，请点击新增任务</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="text-muted fs-14">
+                共 <span th:text="${page.total}"></span> 条数据，第 <span th:text="${page.pageNum}"></span>/<span th:text="${page.pages}"></span> 页
+            </span>
+            <ul class="pagination mb-0">
+                <li class="page-item" th:class="${page.pageNum == 1} ? 'disabled'">
+                    <a class="page-link" th:href="@{/task/list(pageNum=1)}">首页</a>
+                </li>
+                <li class="page-item" th:class="${page.pageNum == 1} ? 'disabled'">
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum - 1})}">上一页</a>
+                </li>
+
+                <th:block th:each="num : ${#numbers.sequence(1, page.pages)}">
+                    <li class="page-item" th:class="${num == page.pageNum} ? 'active'">
+                        <a class="page-link" th:href="@{/task/list(pageNum=${num})}" th:text="${num}"></a>
+                    </li>
+                </th:block>
+
+                <li class="page-item" th:class="${page.pageNum == page.pages} ? 'disabled'">
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pageNum + 1})}">下一页</a>
+                </li>
+                <li class="page-item" th:class="${page.pageNum == page.pages} ? 'disabled'">
+                    <a class="page-link" th:href="@{/task/list(pageNum=${page.pages})}">末页</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</th:block>
+
+</body>
+</html>
